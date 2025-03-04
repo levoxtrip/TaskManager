@@ -9,7 +9,7 @@ interface TaskType {
 const TaskManager = () => {
   //Init state with stored data or empty arrays
   const [importantTasks, setImportantTasks] = useState<TaskType[]>(() => {
-    const stored = localStorage.getItem("importantTask");
+    const stored = localStorage.getItem("importantTasks");
     return stored ? JSON.parse(stored) : [];
   });
 
@@ -35,48 +35,78 @@ const TaskManager = () => {
   const GITHUB_USER = "levoxtrip";
   const REPO_NAME = "TaskManager";
   const FILE_PATH = "tasks.json";
-  const BRANCH = "main"; // Falls du einen anderen Branch hast, ändere das
+  const BRANCH = "main";
 
   const GITHUB_API_URL = `https://api.github.com/repos/${GITHUB_USER}/${REPO_NAME}/contents/${FILE_PATH}`;
   const TOKEN = import.meta.env.VITE_GITHUB_TOKEN;
 
   async function fetchTasks() {
-    const response = await fetch(GITHUB_API_URL, {
-      headers: { Authorization: `token ${TOKEN}` },
-    });
-    const data = await response.json();
-    const content = atob(data.content); // Base64-Dekodierung
-    return JSON.parse(content);
+    try {
+      const response = await fetch(GITHUB_API_URL, {
+        headers: { Authorization: `token ${TOKEN}` },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch tasks");
+      }
+
+      const data = await response.json();
+      const content = atob(data.content);
+      return JSON.parse(content);
+    } catch (error) {
+      console.error("Error fetching tasks:", error);
+      // Fallback to local storage
+      return {
+        importantTasks: JSON.parse(
+          localStorage.getItem("importantTasks") || "[]"
+        ),
+        dailyTasks: JSON.parse(localStorage.getItem("dailyTasks") || "[]"),
+        laterTasks: JSON.parse(localStorage.getItem("laterTasks") || "[]"),
+      };
+    }
   }
 
-  async function saveTasks(tasks: {
-    importantTasks: TaskType[];
-    dailyTasks: TaskType[];
-    laterTasks: TaskType[];
-  }) {
-    const response = await fetch(GITHUB_API_URL, {
-      headers: { Authorization: `token ${TOKEN}` },
-    });
-    const data = await response.json();
+  async function saveTasks(tasks) {
+    try {
+      if (!TOKEN) {
+        console.warn("GitHub token not found. Saving to local storage only.");
+        return;
+      }
 
-    const updatedContent = btoa(JSON.stringify(tasks, null, 2)); // Base64 encode
-    const sha = data.sha;
+      const response = await fetch(GITHUB_API_URL, {
+        headers: { Authorization: `token ${TOKEN}` },
+      });
 
-    const updateResponse = await fetch(GITHUB_API_URL, {
-      method: "PUT",
-      headers: {
-        Authorization: `token ${TOKEN}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        message: "Update tasks.json",
-        content: updatedContent,
-        sha,
-        branch: BRANCH,
-      }),
-    });
+      if (!response.ok) {
+        throw new Error("Failed to get file metadata");
+      }
 
-    return updateResponse.json();
+      const data = await response.json();
+      const updatedContent = btoa(JSON.stringify(tasks, null, 2));
+      const sha = data.sha;
+
+      const updateResponse = await fetch(GITHUB_API_URL, {
+        method: "PUT",
+        headers: {
+          Authorization: `token ${TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: "Update tasks.json",
+          content: updatedContent,
+          sha,
+          branch: BRANCH,
+        }),
+      });
+
+      if (!updateResponse.ok) {
+        throw new Error("Failed to update tasks");
+      }
+
+      return updateResponse.json();
+    } catch (error) {
+      console.error("Error saving tasks:", error);
+    }
   }
 
   useEffect(() => {
