@@ -38,10 +38,23 @@ const TaskManager = () => {
   const BRANCH = "main";
 
   const GITHUB_API_URL = `https://api.github.com/repos/${GITHUB_USER}/${REPO_NAME}/contents/${FILE_PATH}`;
-  const TOKEN = import.meta.env.VITE_GITHUB_TOKEN;
 
   async function fetchTasks() {
     try {
+      // Only attempt GitHub sync if in development and token exists
+      const TOKEN = import.meta.env.VITE_GITHUB_TOKEN;
+
+      if (!TOKEN) {
+        console.warn("No GitHub token. Using local storage.");
+        return {
+          importantTasks: JSON.parse(
+            localStorage.getItem("importantTasks") || "[]"
+          ),
+          dailyTasks: JSON.parse(localStorage.getItem("dailyTasks") || "[]"),
+          laterTasks: JSON.parse(localStorage.getItem("laterTasks") || "[]"),
+        };
+      }
+
       const response = await fetch(GITHUB_API_URL, {
         headers: { Authorization: `token ${TOKEN}` },
       });
@@ -65,14 +78,18 @@ const TaskManager = () => {
       };
     }
   }
+
   async function saveTasks(tasks: {
     importantTasks: TaskType[];
     dailyTasks: TaskType[];
     laterTasks: TaskType[];
   }) {
     try {
+      // Only attempt GitHub sync if in development and token exists
+      const TOKEN = import.meta.env.VITE_GITHUB_TOKEN;
+
       if (!TOKEN) {
-        console.warn("GitHub token not found. Saving to local storage only.");
+        console.warn("No GitHub token. Saving to local storage only.");
         return;
       }
 
