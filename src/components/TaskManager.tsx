@@ -65,8 +65,11 @@ const TaskManager = () => {
       };
     }
   }
-
-  async function saveTasks(tasks) {
+  async function saveTasks(tasks: {
+    importantTasks: TaskType[];
+    dailyTasks: TaskType[];
+    laterTasks: TaskType[];
+  }) {
     try {
       if (!TOKEN) {
         console.warn("GitHub token not found. Saving to local storage only.");
